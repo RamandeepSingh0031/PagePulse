@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Analyzer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 70%;
+            padding: 10px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            background-color: #f4f4f4;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .metric {
+            margin-bottom: 10px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        .metric span {
+            display: inline-block;
+            margin-bottom: 5px;
+            position: relative;
+        }
+        .metric .tooltip {
+            display: none;
+            position: absolute;
+            background-color: #333;
+            color: #fff;
+            padding: 5px;
+            border-radius: 5px;
+            top: 100%;
+            left: 0;
+            white-space: nowrap;
+            z-index: 100;
+        }
+        .metric:hover .tooltip {
+            display: block;
+        }
+        .green-hosting-status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        .green-hosting-true {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #a5d6a7;
+        }
+
+        .green-hosting-false {
+            background-color: #fafafa;
+            color: #616161;
+            border: 1px solid #e0e0e0;
+        }
+
+        .improvement {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .improvement.success {
+            background-color: #e8f5e9;
+            border-color: #a5d6a7;
+        }
+
+        .improvement.improvement {
+            background-color: #fff3e0;
+            border-color: #ffcc80;
+        }
+    </style>
+</head>
+<body>
+    <h1>Website Carbon Estimator</h1>
+    <form id="analyzeForm">
+        <label for="url">Enter Website URL:</label>
+        <input type="text" id="url" name="url" required>
+        <button type="submit">Analyze</button>
+    </form>
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('analyzeForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const url = document.getElementById('url').value;
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Analyzing...';
+
+            try {
+                const response = await fetch(`/analyze?url=${encodeURIComponent(url)}`);
+                const result = await response.json();
+
+                if (response.ok) {
+                    let html = `
+                        <h2>Analysis Results for ${result.url}</h2>
+                        
+                        <div class="green-hosting-status ${result.greenHosting.isGreen ? 'green-hosting-true' : 'green-hosting-false'}">
+                            ${result.greenHosting.message}
+                        </div>
+
+                        <p><strong>CO2 Emissions:</strong> ${result.emissions} grams</p>
+                        <p><strong>Data Transfer Size:</strong> ${(result.dataTransferSize / 1024 / 1024).toFixed(2)} MB</p>
+                        
+                        <h3>Lighthouse Scores</h3>
+                        <p>Performance: ${result.lighthouse.performance.toFixed(0)}</p>
+                        <p>Accessibility: ${result.lighthouse.accessibility.toFixed(0)}</p>
+                        <p>Best Practices: ${result.lighthouse.bestPractices.toFixed(0)}</p>
+                        <p>SEO: ${result.lighthouse.seo.toFixed(0)}</p>
+
+                        <h3>Key Metrics</h3>
+                    `;
+
+                    // Define metrics and tooltips
+                    const metrics = {
+                        'firstContentfulPaint': 'First Content Appears',
+                        'speedIndex': 'Visual Loading Speed',
+                        'largestContentfulPaint': 'Main Content Loaded',
+                        'interactive': 'Ready for Interaction',
+                        'totalBlockingTime': 'Delay Before Usable',
+                        'timeToInteractive': 'Ready for Interaction'
+                    };
+
+                    const tooltips = {
+                        'firstContentfulPaint': '≤ 1.8s (Good), 1.8s – 3.0s (Needs Improvement), > 3.0s (Poor)',
+                        'speedIndex': '≤ 3.4s (Good), 3.4s – 5.8s (Needs Improvement), > 5.8s (Poor)',
+                        'largestContentfulPaint': '≤ 2.5s (Good), 2.5s – 4.0s (Needs Improvement), > 4.0s (Poor)',
+                        'totalBlockingTime': '≤ 200ms (Good), 200ms – 600ms (Needs Improvement), > 600ms (Poor)',
+                        'timeToInteractive': '≤ 3.8s (Good), 3.8s – 7.3s (Needs Improvement), > 7.3s (Poor)'
+                    };
+
+                    for (const [key, value] of Object.entries(result.metrics)) {
+                        const label = metrics[key] || key;
+                        const tooltip = tooltips[key] || 'No tooltip available';
+                        html += `<div class="metric">
+                            <span><strong>${label}:</strong> ${value}</span>
+                            <div class="tooltip">${tooltip}</div>
+                        </div>`;
+                    }
+
+                    html += '<h3>Findings & Improvements</h3>';
+                    result.improvements.forEach(improvement => {
+                        html += `
+                            <div class="improvement ${improvement.type || 'improvement'}">
+                                <strong>${improvement.title}</strong>
+                                <p>${improvement.description}</p>
+                                <p>Potential savings: ${improvement.savings}</p>
+                            </div>
+                        `;
+                    });
+
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.innerHTML = `<p>Error: ${result.error}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
